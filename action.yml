@@ -1,0 +1,341 @@
+name: 'Docker Build and Push'
+description: 'Thin wrapper around docker/build-push-action with simplified inputs'
+author: 'KoalaOps'
+
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  # Simple mode - just provide tags
+  tags:
+    description: 'List of image tags (multiline string)'
+    required: false
+  
+  # Advanced mode - JSON array for complex scenarios
+  targets_json:
+    description: 'JSON array of {image, tag} objects (overrides tags)'
+    required: false
+  
+  # Label generation options
+  use_metadata_labels:
+    description: 'Use docker/metadata-action for rich OCI labels'
+    required: false
+    default: 'true'
+  metadata_images:
+    description: 'Base image names for metadata-action (used only when use_metadata_labels=true)'
+    required: false
+  
+  # Docker build inputs (pass-through to docker/build-push-action)
+  context:
+    description: 'Build context path'
+    required: false
+    default: '.'
+  dockerfile:
+    description: 'Path to Dockerfile (relative to context)'
+    required: false
+    default: 'Dockerfile'
+  platforms:
+    description: 'List of target platforms for build'
+    required: false
+    default: 'linux/amd64'
+  build_args:
+    description: 'List of build-time variables (multiline string)'
+    required: false
+  labels:
+    description: 'List of metadata labels (multiline string)'
+    required: false
+  cache_from:
+    description: 'List of external cache sources'
+    required: false
+    default: 'type=gha'
+  cache_to:
+    description: 'List of cache export destinations'
+    required: false
+    default: 'type=gha,mode=max'
+  push:
+    description: 'Push images to registry'
+    required: false
+    default: 'true'
+  load:
+    description: 'Load image into Docker daemon'
+    required: false
+    default: 'false'
+  no_cache:
+    description: 'Do not use cache when building the image'
+    required: false
+    default: 'false'
+  pull:
+    description: 'Always attempt to pull a newer version of the image'
+    required: false
+    default: 'false'
+  target:
+    description: 'Sets the target stage to build'
+    required: false
+  secrets:
+    description: 'List of secrets to expose to the build'
+    required: false
+  ssh:
+    description: 'List of SSH agent socket or keys to expose to the build'
+    required: false
+
+outputs:
+  imageid:
+    description: 'Image ID'
+    value: ${{ steps.build.outputs.imageid }}
+  digest:
+    description: 'Image digest'
+    value: ${{ steps.build.outputs.digest }}
+  metadata:
+    description: 'Build result metadata'
+    value: ${{ steps.build.outputs.metadata }}
+  tags_list:
+    description: 'Newline-delimited image:tag list'
+    value: ${{ steps.tags.outputs.tags }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up QEMU
+      if: ${{ contains(inputs.platforms, ',') || (inputs.platforms != '' && inputs.platforms != 'linux/amd64') }}
+      uses: docker/setup-qemu-action@v3
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Check for conflicting inputs
+        if [[ "${{ inputs.push }}" == "true" ]] && [[ "${{ inputs.load }}" == "true" ]]; then
+          echo "::error::Cannot use both 'push: true' and 'load: true' together. Docker cannot push and load in the same operation."
+          exit 1
+        fi
+        
+        # Warn about multi-platform with load
+        if [[ "${{ inputs.load }}" == "true" ]] && [[ "${{ inputs.platforms }}" == *","* ]]; then
+          echo "::warning::Loading multi-platform images is not supported. Only the native platform will be loaded."
+        fi
+    
+    - name: Process tags
+      id: tags
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        # Fail if both inputs are provided
+        if [[ -n "${{ inputs.targets_json }}" ]] && [[ -n "${{ inputs.tags }}" ]]; then
+          echo "::error::Provide either 'targets_json' OR 'tags', not both."
+          exit 1
+        fi
+        
+        # Process based on which input is provided
+        if [[ -n "${{ inputs.targets_json }}" ]]; then
+          echo "📋 Processing targets_json..."
+          
+          # Validate JSON format
+          if ! echo '${{ inputs.targets_json }}' | jq empty >/dev/null 2>&1; then
+            echo "::error::Invalid targets_json (not valid JSON)"
+            exit 1
+          fi
+          
+          # Validate JSON structure
+          if ! echo '${{ inputs.targets_json }}' | jq -e 'type=="array" and all(.[]; has("image") and has("tag") and (.image|type=="string") and (.tag|type=="string"))' >/dev/null 2>&1; then
+            echo "::error::targets_json must be an array of objects with string fields 'image' and 'tag'"
+            exit 1
+          fi
+          
+          # Convert JSON to tags, trim whitespace, remove blanks, dedupe
+          TAGS=$(echo '${{ inputs.targets_json }}' \
+            | jq -r '.[] | "\(.image):\(.tag)"' \
+            | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+            | awk 'NF' \
+            | sort -u)
+          
+        elif [[ -n "${{ inputs.tags }}" ]]; then
+          echo "📋 Using provided tags..."
+          
+          # Trim whitespace, remove blank lines, dedupe
+          TAGS=$(printf "%s\n" "${{ inputs.tags }}" \
+            | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+            | awk 'NF' \
+            | sort -u)
+          
+        else
+          echo "::error::Either 'tags' or 'targets_json' must be provided"
+          exit 1
+        fi
+        
+        # Verify we have at least one valid tag
+        if [[ -z "${TAGS}" ]]; then
+          echo "::error::No valid tags provided after normalization"
+          exit 1
+        fi
+        
+        echo "📝 Tags to build:"
+        echo "$TAGS" | sed 's/^/  - /'
+        
+        # Output for next step
+        echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$TAGS" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+        
+        # Count tags
+        echo "tag_count=$(echo "$TAGS" | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+        echo "📊 Total tags to push: $(echo "$TAGS" | wc -l | tr -d ' ')"
+    
+    - name: Extract image names from tags
+      if: ${{ inputs.use_metadata_labels == 'true' && inputs.metadata_images == '' }}
+      id: extract_images
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Extract unique registry/image combinations from tags
+        TAGS="${{ steps.tags.outputs.tags }}"
+        
+        # Strip trailing ':tag' OR '@sha256:...' to get base image
+        # This handles both tag and digest formats correctly
+        IMAGES=$(echo "$TAGS" \
+          | sed -E 's/@sha256:[0-9a-f]+$//' \
+          | sed -E 's/:[^:@]+$//' \
+          | sort -u)
+        
+        echo "Extracted base images:"
+        echo "$IMAGES" | sed 's/^/  - /'
+        
+        # Output with multiline format
+        echo "images<<EOF" >> "$GITHUB_OUTPUT"
+        echo "$IMAGES" >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+    
+    - name: Generate labels with metadata-action
+      if: ${{ inputs.use_metadata_labels == 'true' }}
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ inputs.metadata_images != '' && inputs.metadata_images || steps.extract_images.outputs.images }}
+        labels: |
+          org.opencontainers.image.title=${{ github.event.repository.name }}
+          org.opencontainers.image.description=${{ github.event.repository.description }}
+          org.opencontainers.image.vendor=KoalaOps
+          ${{ inputs.labels }}
+    
+    - name: Generate fallback labels
+      if: ${{ inputs.use_metadata_labels != 'true' }}
+      id: labels
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Start with user-provided labels
+        LABELS="${{ inputs.labels }}"
+        
+        # Add standard OCI labels
+        TIMESTAMP="${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}"
+        if [[ -z "$TIMESTAMP" ]]; then
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        fi
+        
+        # Append standard labels
+        LABELS="$LABELS
+        org.opencontainers.image.created=$TIMESTAMP
+        org.opencontainers.image.revision=${{ github.sha }}
+        org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+        org.opencontainers.image.url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        org.opencontainers.image.version=${{ github.ref_name }}
+        org.opencontainers.image.authors=${{ github.actor }}"
+        
+        # Output multiline labels
+        echo "labels<<EOF" >> $GITHUB_OUTPUT
+        echo "$LABELS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Determine Dockerfile path
+      id: dockerfile
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Handle dockerfile path (absolute vs relative)
+        DOCKERFILE="${{ inputs.dockerfile }}"
+        CONTEXT="${{ inputs.context }}"
+        
+        # Check if dockerfile is an absolute path
+        if [[ "$DOCKERFILE" == /* ]]; then
+          echo "📁 Using absolute Dockerfile path: $DOCKERFILE"
+          echo "path=$DOCKERFILE" >> $GITHUB_OUTPUT
+        else
+          # Relative path - join with context
+          if [[ "$CONTEXT" == "." ]] || [[ -z "$CONTEXT" ]]; then
+            echo "📁 Using relative Dockerfile path: $DOCKERFILE"
+            echo "path=$DOCKERFILE" >> $GITHUB_OUTPUT
+          else
+            # Join context and dockerfile path
+            FULL_PATH="${CONTEXT%/}/${DOCKERFILE#/}"
+            echo "📁 Using Dockerfile path: $FULL_PATH"
+            echo "path=$FULL_PATH" >> $GITHUB_OUTPUT
+          fi
+        fi
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ steps.dockerfile.outputs.path }}
+        platforms: ${{ inputs.platforms }}
+        build-args: ${{ inputs.build_args }}
+        labels: ${{ steps.meta.outputs.labels || steps.labels.outputs.labels }}
+        tags: ${{ steps.tags.outputs.tags }}
+        push: ${{ inputs.push }}
+        load: ${{ inputs.load }}
+        cache-from: ${{ inputs.cache_from }}
+        cache-to: ${{ inputs.cache_to }}
+        no-cache: ${{ inputs.no_cache }}
+        pull: ${{ inputs.pull }}
+        target: ${{ inputs.target }}
+        secrets: ${{ inputs.secrets }}
+        ssh: ${{ inputs.ssh }}
+    
+    - name: Generate summary
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ steps.build.outcome }}" == "success" ]]; then
+          echo "✅ **Build Status:** Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### 📦 Built Images" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.tags.outputs.tags }}" | while IFS= read -r tag; do
+            [[ -n "$tag" ]] && echo "- \`$tag\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ -n "${{ steps.build.outputs.digest }}" ]]; then
+            echo "### 🔑 Image Digest" >> $GITHUB_STEP_SUMMARY
+            echo "\`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ -n "${{ steps.build.outputs.imageid }}" ]]; then
+            echo "### 🆔 Image ID" >> $GITHUB_STEP_SUMMARY
+            echo "\`${{ steps.build.outputs.imageid }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### ⚙️ Build Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Context:** \`${{ inputs.context }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dockerfile:** \`${{ steps.dockerfile.outputs.path }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms:** \`${{ inputs.platforms }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Push:** \`${{ inputs.push }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Load:** \`${{ inputs.load }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cache:** \`${{ inputs.cache_from }}\` → \`${{ inputs.cache_to }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Label Generation:** \`${{ inputs.use_metadata_labels == 'true' && 'docker/metadata-action' || 'built-in' }}\`" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Build Status:** Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the logs above for error details." >> $GITHUB_STEP_SUMMARY
+        fi
