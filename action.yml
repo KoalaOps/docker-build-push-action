@@ -1,4 +1,4 @@
-name: 'Docker Build and Push'
+name: 'Docker Multi-Registry Build Push'
 description: 'Thin wrapper around docker/build-push-action with simplified inputs'
 author: 'KoalaOps'
 
