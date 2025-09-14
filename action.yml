@@ -1,5 +1,5 @@
 name: 'Docker Multi-Registry Build Push'
-description: 'Thin wrapper around docker/build-push-action with simplified inputs'
+description: 'Thin wrapper around docker/build-push-action with smart tagging and multi-registry support'
 author: 'KoalaOps'
 
 branding:
@@ -246,7 +246,7 @@ runs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Add reminder for multi-registry authentication
-          REGISTRY_COUNT=$(printf "%s\n" "${{ steps.final_tags.outputs.tags }}" | sed -E 's/:.*//' | sort -u | wc -l | tr -d ' ')
+          REGISTRY_COUNT=$(printf "%s\n" "${{ steps.final_tags.outputs.tags }}" | sed -E 's|/.*||' | sort -u | wc -l | tr -d ' ')
           if [[ $REGISTRY_COUNT -gt 1 ]]; then
             echo "> 💡 **Note:** Using multiple registries - ensure you've authenticated to each one before this action." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
