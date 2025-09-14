@@ -1,5 +1,7 @@
 # Docker Build and Push Action
 
+[![Release](https://github.com/KoalaOps/docker-build-push-action/actions/workflows/release.yml/badge.svg)](https://github.com/KoalaOps/docker-build-push-action/actions/workflows/release.yml)
+
 A thin wrapper around the official `docker/build-push-action` that simplifies common use cases while maintaining full compatibility.
 
 ## Why This Wrapper?
