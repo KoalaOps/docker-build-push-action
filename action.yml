@@ -19,8 +19,8 @@ inputs:
   base_tag:
     description: 'Primary tag value (e.g., v1.2.3 or branch-date)'
     required: false
-  tag_latest:
-    description: 'Also tag :latest on the default branch'
+  tag_latest_on_default_branch:
+    description: 'Add :latest tag when building from default branch (main/master)'
     required: false
     default: 'true'
   tag_sha:
@@ -171,7 +171,7 @@ runs:
         tags: |
           ${{ (inputs.image != '' && inputs.base_tag != '') && format('type=raw,value={0}', inputs.base_tag) || '' }}
           ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.tag_sha == 'true') && 'type=sha,format=short,prefix=sha-' || '' }}
-          ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.tag_latest == 'true') && 'type=raw,value=latest,enable={{is_default_branch}}' || '' }}
+          ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.tag_latest_on_default_branch == 'true') && 'type=raw,value=latest,enable={{is_default_branch}}' || '' }}
           ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.include_ref_tags == 'true') && 'type=ref,event=branch' || '' }}
           ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.include_ref_tags == 'true') && 'type=ref,event=pr' || '' }}
           ${{ (inputs.image != '' && inputs.base_tag != '' && inputs.include_semver_tags == 'true') && 'type=semver,pattern={{version}}' || '' }}

@@ -91,7 +91,7 @@ The simplest way to use this action - just provide the image repository and prim
 |-------|-------------|----------|---------|
 | `image` | Base image repository (e.g., `ghcr.io/org/app`). Supports multiple repositories (newline-delimited) | Yes* | - |
 | `base_tag` | Primary tag (e.g., `v1.2.3`) | Yes* | - |
-| `tag_latest` | Add `:latest` tag when on default branch | No | `true` |
+| `tag_latest_on_default_branch` | Add `:latest` tag when building from default branch (main/master) | No | `true` |
 | `tag_sha` | Add `:sha-<short>` tag for traceability | No | `true` |
 | `include_ref_tags` | Generate branch/PR tags (e.g., `pr-123`, `feature-branch`) | No | `false` |
 | `include_semver_tags` | Generate major/minor tags from semver (e.g., `1`, `1.2` from `v1.2.3`) | No | `true` |
@@ -171,7 +171,7 @@ The simplest way to use this action - just provide the image repository and prim
     image: myregistry.io/myapp
     base_tag: v1.2.3
     tag_sha: false       # No SHA tag
-    tag_latest: true     # Still add latest on default branch
+    tag_latest_on_default_branch: true  # Still add latest on default branch
     include_semver_tags: true  # Also generates '1' and '1.2' tags
 ```
 
