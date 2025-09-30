@@ -163,24 +163,31 @@ runs:
       if: ${{ contains(inputs.platforms, ',') || (inputs.platforms != '' && inputs.platforms != 'linux/amd64') }}
       uses: docker/setup-qemu-action@v3
 
+    # Use default buildx when no custom parameters provided
     - name: Set up Docker Buildx
+      if: ${{ !inputs.buildx_version && !inputs.buildx_name && !inputs.buildx_driver && !inputs.buildx_driver_opts && !inputs.buildx_buildkitd_flags && !inputs.buildx_buildkitd_config && !inputs.buildx_buildkitd_config_inline && !inputs.buildx_install && !inputs.buildx_use && !inputs.buildx_endpoint && !inputs.buildx_platforms && !inputs.buildx_append && !inputs.buildx_keep_state && !inputs.buildx_cache_binary && !inputs.buildx_cleanup }}
+      uses: docker/setup-buildx-action@v3
+
+    # Use custom buildx configuration when any parameter is provided
+    - name: Set up Docker Buildx (custom)
+      if: ${{ inputs.buildx_version || inputs.buildx_name || inputs.buildx_driver || inputs.buildx_driver_opts || inputs.buildx_buildkitd_flags || inputs.buildx_buildkitd_config || inputs.buildx_buildkitd_config_inline || inputs.buildx_install || inputs.buildx_use || inputs.buildx_endpoint || inputs.buildx_platforms || inputs.buildx_append || inputs.buildx_keep_state || inputs.buildx_cache_binary || inputs.buildx_cleanup }}
       uses: docker/setup-buildx-action@v3
       with:
         version: ${{ inputs.buildx_version }}
         name: ${{ inputs.buildx_name }}
-        driver: ${{ inputs.buildx_driver }}
+        driver: ${{ inputs.buildx_driver || 'docker-container' }}
         driver-opts: ${{ inputs.buildx_driver_opts }}
         buildkitd-flags: ${{ inputs.buildx_buildkitd_flags }}
         buildkitd-config: ${{ inputs.buildx_buildkitd_config }}
         buildkitd-config-inline: ${{ inputs.buildx_buildkitd_config_inline }}
-        install: ${{ inputs.buildx_install }}
-        use: ${{ inputs.buildx_use }}
+        install: ${{ inputs.buildx_install || 'false' }}
+        use: ${{ inputs.buildx_use || 'true' }}
         endpoint: ${{ inputs.buildx_endpoint }}
         platforms: ${{ inputs.buildx_platforms }}
         append: ${{ inputs.buildx_append }}
-        keep-state: ${{ inputs.buildx_keep_state }}
-        cache-binary: ${{ inputs.buildx_cache_binary }}
-        cleanup: ${{ inputs.buildx_cleanup }}
+        keep-state: ${{ inputs.buildx_keep_state || 'false' }}
+        cache-binary: ${{ inputs.buildx_cache_binary || 'true' }}
+        cleanup: ${{ inputs.buildx_cleanup || 'true' }}
 
     - name: Validate inputs
       shell: bash
