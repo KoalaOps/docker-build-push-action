@@ -21,6 +21,7 @@ jobs:
           image: test/myapp
           base_tag: test-${{ github.run_number }}
           context: ./test
+          dockerfile: ./test/Dockerfile
           push: false
           load: true
 
@@ -44,6 +45,7 @@ jobs:
             test/app:v1.0.0
             test/app:latest
           context: ./test
+          dockerfile: ./test/Dockerfile
           push: false
           load: true
 
@@ -66,6 +68,7 @@ jobs:
         with:
           tags: test/buildx:custom
           context: ./test
+          dockerfile: ./test/Dockerfile
           buildx_driver: docker-container
           buildx_name: custom-builder
           buildx_driver_opts: |
@@ -98,6 +101,7 @@ jobs:
         with:
           tags: test/multiarch:test
           context: ./test
+          dockerfile: ./test/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
           # Note: load is not set to true because multi-platform builds can't be loaded
