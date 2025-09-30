@@ -138,6 +138,12 @@ The simplest way to use this action - just provide the image repository and prim
 | `provenance` | Enable provenance attestation | No | `false` |
 | `sbom` | Generate SBOM attestation | No | `false` |
 
+### Advanced Configuration
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `setup_buildx_with` | Custom configuration for docker/setup-buildx-action (YAML format) | No | - |
+
 ## Outputs
 
 | Output | Description |
@@ -277,6 +283,44 @@ steps:
     base_tag: v1.2.3
     provenance: true  # Generate provenance attestation
     sbom: true        # Generate SBOM attestation
+```
+
+### Custom Buildx Configuration
+
+```yaml
+# Configure buildx with custom driver and settings
+- uses: KoalaOps/docker-build-push-action@v1
+  with:
+    image: myregistry.io/myapp
+    base_tag: v1.2.3
+    setup_buildx_with: |
+      driver: docker-container
+      driver-opts: |
+        network=host
+        image=moby/buildkit:v0.12.0
+      install: true
+      platforms: linux/amd64,linux/arm64
+
+# Use remote BuildKit instance
+- uses: KoalaOps/docker-build-push-action@v1
+  with:
+    image: myregistry.io/myapp
+    base_tag: v1.2.3
+    setup_buildx_with: |
+      driver: remote
+      endpoint: tcp://buildkit.example.com:8125
+
+# Configure buildx with specific builder instance
+- uses: KoalaOps/docker-build-push-action@v1
+  with:
+    image: myregistry.io/myapp
+    base_tag: v1.2.3
+    setup_buildx_with: |
+      use: true
+      driver: kubernetes
+      driver-opts: |
+        namespace=buildkit
+        replicas=2
 ```
 
 ## Migration from docker/build-push-action

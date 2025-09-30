@@ -1,0 +1,12 @@
+FROM alpine:3.19
+
+ARG TEST_ARG=default
+ARG VERSION=unknown
+
+ENV TEST_ARG=${TEST_ARG}
+ENV VERSION=${VERSION}
+
+RUN echo "Test arg: ${TEST_ARG}" > /message.txt && \
+    echo "Version: ${VERSION}" >> /message.txt
+
+CMD ["cat", "/message.txt"]

@@ -94,6 +94,19 @@ inputs:
     required: false
     default: 'false'
 
+  # Setup buildx options (pass-through to docker/setup-buildx-action)
+  setup_buildx_with:
+    description: |
+      YAML configuration for docker/setup-buildx-action. Example:
+        driver: docker-container
+        driver-opts: |
+          network=host
+          image=moby/buildkit:v0.12.0
+        install: true
+        platforms: linux/amd64,linux/arm64
+    required: false
+    default: ''
+
 outputs:
   imageid:
     description: 'Image ID'
@@ -117,6 +130,7 @@ runs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with: ${{ inputs.setup_buildx_with != '' && fromYAML(inputs.setup_buildx_with) || fromYAML('{}') }}
 
     - name: Validate inputs
       shell: bash
