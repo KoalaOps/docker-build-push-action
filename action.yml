@@ -94,6 +94,54 @@ inputs:
     required: false
     default: 'false'
 
+  # Setup buildx options (pass-through to docker/setup-buildx-action)
+  # All parameters prefixed with buildx_ are passed directly to setup-buildx-action
+  buildx_version:
+    description: 'Buildx version (e.g., v0.3.0, latest, https://github.com/docker/buildx.git#master)'
+    required: false
+  buildx_name:
+    description: 'Name of the builder (auto-generated if not specified)'
+    required: false
+  buildx_driver:
+    description: 'Builder driver (docker-container, docker, kubernetes, remote)'
+    required: false
+  buildx_driver_opts:
+    description: 'List of additional driver-specific options (e.g., image=moby/buildkit:master)'
+    required: false
+  buildx_buildkitd_flags:
+    description: 'BuildKit daemon flags'
+    required: false
+  buildx_buildkitd_config:
+    description: 'BuildKit daemon config file'
+    required: false
+  buildx_buildkitd_config_inline:
+    description: 'BuildKit daemon config inline'
+    required: false
+  buildx_install:
+    description: 'Set up docker build command as an alias to docker buildx'
+    required: false
+  buildx_use:
+    description: 'Switch to this builder instance'
+    required: false
+  buildx_endpoint:
+    description: 'Optional address for docker socket or context from docker context ls'
+    required: false
+  buildx_platforms:
+    description: 'Fixed platforms for current node (overrides detected ones)'
+    required: false
+  buildx_append:
+    description: 'Append additional nodes to the builder (YAML format)'
+    required: false
+  buildx_keep_state:
+    description: 'Keep BuildKit state on cleanup (useful for persistent self-hosted runners)'
+    required: false
+  buildx_cache_binary:
+    description: 'Cache buildx binary to GitHub Actions cache backend'
+    required: false
+  buildx_cleanup:
+    description: 'Cleanup temp files and remove builder at the end of a job'
+    required: false
+
 outputs:
   imageid:
     description: 'Image ID'
@@ -115,8 +163,31 @@ runs:
       if: ${{ contains(inputs.platforms, ',') || (inputs.platforms != '' && inputs.platforms != 'linux/amd64') }}
       uses: docker/setup-qemu-action@v3
 
+    # Use default buildx when no custom parameters provided
     - name: Set up Docker Buildx
+      if: ${{ !inputs.buildx_version && !inputs.buildx_name && !inputs.buildx_driver && !inputs.buildx_driver_opts && !inputs.buildx_buildkitd_flags && !inputs.buildx_buildkitd_config && !inputs.buildx_buildkitd_config_inline && !inputs.buildx_install && !inputs.buildx_use && !inputs.buildx_endpoint && !inputs.buildx_platforms && !inputs.buildx_append && !inputs.buildx_keep_state && !inputs.buildx_cache_binary && !inputs.buildx_cleanup }}
       uses: docker/setup-buildx-action@v3
+
+    # Use custom buildx configuration when any parameter is provided
+    - name: Set up Docker Buildx (custom)
+      if: ${{ inputs.buildx_version || inputs.buildx_name || inputs.buildx_driver || inputs.buildx_driver_opts || inputs.buildx_buildkitd_flags || inputs.buildx_buildkitd_config || inputs.buildx_buildkitd_config_inline || inputs.buildx_install || inputs.buildx_use || inputs.buildx_endpoint || inputs.buildx_platforms || inputs.buildx_append || inputs.buildx_keep_state || inputs.buildx_cache_binary || inputs.buildx_cleanup }}
+      uses: docker/setup-buildx-action@v3
+      with:
+        version: ${{ inputs.buildx_version }}
+        name: ${{ inputs.buildx_name }}
+        driver: ${{ inputs.buildx_driver || 'docker-container' }}
+        driver-opts: ${{ inputs.buildx_driver_opts }}
+        buildkitd-flags: ${{ inputs.buildx_buildkitd_flags }}
+        buildkitd-config: ${{ inputs.buildx_buildkitd_config }}
+        buildkitd-config-inline: ${{ inputs.buildx_buildkitd_config_inline }}
+        install: ${{ inputs.buildx_install || 'false' }}
+        use: ${{ inputs.buildx_use || 'true' }}
+        endpoint: ${{ inputs.buildx_endpoint }}
+        platforms: ${{ inputs.buildx_platforms }}
+        append: ${{ inputs.buildx_append }}
+        keep-state: ${{ inputs.buildx_keep_state || 'false' }}
+        cache-binary: ${{ inputs.buildx_cache_binary || 'true' }}
+        cleanup: ${{ inputs.buildx_cleanup || 'true' }}
 
     - name: Validate inputs
       shell: bash
