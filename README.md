@@ -138,11 +138,27 @@ The simplest way to use this action - just provide the image repository and prim
 | `provenance` | Enable provenance attestation | No | `false` |
 | `sbom` | Generate SBOM attestation | No | `false` |
 
-### Advanced Configuration
+### Buildx Configuration
+
+All parameters prefixed with `buildx_` are passed directly to docker/setup-buildx-action:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `setup_buildx_with` | Custom configuration for docker/setup-buildx-action (YAML format) | No | - |
+| `buildx_version` | Buildx version (e.g., v0.3.0, latest) | No | - |
+| `buildx_name` | Builder name (auto-generated if not specified) | No | - |
+| `buildx_driver` | Builder driver (docker-container, docker, kubernetes, remote) | No | - |
+| `buildx_driver_opts` | Driver-specific options (e.g., image=moby/buildkit:master) | No | - |
+| `buildx_buildkitd_flags` | BuildKit daemon flags | No | - |
+| `buildx_buildkitd_config` | BuildKit daemon config file | No | - |
+| `buildx_buildkitd_config_inline` | BuildKit daemon config inline | No | - |
+| `buildx_install` | Set up docker build as alias to docker buildx | No | - |
+| `buildx_use` | Switch to this builder instance | No | - |
+| `buildx_endpoint` | Address for docker socket or context | No | - |
+| `buildx_platforms` | Fixed platforms for current node | No | - |
+| `buildx_append` | Append additional nodes to builder (YAML) | No | - |
+| `buildx_keep_state` | Keep BuildKit state on cleanup | No | - |
+| `buildx_cache_binary` | Cache buildx binary | No | - |
+| `buildx_cleanup` | Cleanup temp files and remove builder | No | - |
 
 ## Outputs
 
@@ -293,34 +309,41 @@ steps:
   with:
     image: myregistry.io/myapp
     base_tag: v1.2.3
-    setup_buildx_with: |
-      driver: docker-container
-      driver-opts: |
-        network=host
-        image=moby/buildkit:v0.12.0
-      install: true
-      platforms: linux/amd64,linux/arm64
+    buildx_driver: docker-container
+    buildx_driver_opts: |
+      network=host
+      image=moby/buildkit:v0.12.0
+    buildx_install: true
+    buildx_platforms: linux/amd64,linux/arm64
 
 # Use remote BuildKit instance
 - uses: KoalaOps/docker-build-push-action@v1
   with:
     image: myregistry.io/myapp
     base_tag: v1.2.3
-    setup_buildx_with: |
-      driver: remote
-      endpoint: tcp://buildkit.example.com:8125
+    buildx_driver: remote
+    buildx_endpoint: tcp://buildkit.example.com:8125
 
 # Configure buildx with specific builder instance
 - uses: KoalaOps/docker-build-push-action@v1
   with:
     image: myregistry.io/myapp
     base_tag: v1.2.3
-    setup_buildx_with: |
-      use: true
-      driver: kubernetes
-      driver-opts: |
-        namespace=buildkit
-        replicas=2
+    buildx_name: my-custom-builder
+    buildx_driver: kubernetes
+    buildx_driver_opts: |
+      namespace=buildkit
+      replicas=2
+    buildx_use: true
+
+# Use specific buildx version with custom flags
+- uses: KoalaOps/docker-build-push-action@v1
+  with:
+    image: myregistry.io/myapp
+    base_tag: v1.2.3
+    buildx_version: v0.11.2
+    buildx_buildkitd_flags: --debug --allow-insecure-entitlement network.host
+    buildx_install: true
 ```
 
 ## Migration from docker/build-push-action

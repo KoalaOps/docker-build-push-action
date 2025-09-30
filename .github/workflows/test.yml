@@ -66,13 +66,12 @@ jobs:
         with:
           tags: test/buildx:custom
           context: ./test
-          setup_buildx_with: |
-            driver: docker-container
-            name: custom-builder
-            driver-opts: |
-              network=bridge
-            buildkitd-flags: --debug
-            install: true
+          buildx_driver: docker-container
+          buildx_name: custom-builder
+          buildx_driver_opts: |
+            network=bridge
+          buildx_buildkitd_flags: --debug
+          buildx_install: true
           push: false
           load: true
 

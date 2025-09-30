@@ -95,17 +95,52 @@ inputs:
     default: 'false'
 
   # Setup buildx options (pass-through to docker/setup-buildx-action)
-  setup_buildx_with:
-    description: |
-      YAML configuration for docker/setup-buildx-action. Example:
-        driver: docker-container
-        driver-opts: |
-          network=host
-          image=moby/buildkit:v0.12.0
-        install: true
-        platforms: linux/amd64,linux/arm64
+  # All parameters prefixed with buildx_ are passed directly to setup-buildx-action
+  buildx_version:
+    description: 'Buildx version (e.g., v0.3.0, latest, https://github.com/docker/buildx.git#master)'
     required: false
-    default: ''
+  buildx_name:
+    description: 'Name of the builder (auto-generated if not specified)'
+    required: false
+  buildx_driver:
+    description: 'Builder driver (docker-container, docker, kubernetes, remote)'
+    required: false
+  buildx_driver_opts:
+    description: 'List of additional driver-specific options (e.g., image=moby/buildkit:master)'
+    required: false
+  buildx_buildkitd_flags:
+    description: 'BuildKit daemon flags'
+    required: false
+  buildx_buildkitd_config:
+    description: 'BuildKit daemon config file'
+    required: false
+  buildx_buildkitd_config_inline:
+    description: 'BuildKit daemon config inline'
+    required: false
+  buildx_install:
+    description: 'Set up docker build command as an alias to docker buildx'
+    required: false
+  buildx_use:
+    description: 'Switch to this builder instance'
+    required: false
+  buildx_endpoint:
+    description: 'Optional address for docker socket or context from docker context ls'
+    required: false
+  buildx_platforms:
+    description: 'Fixed platforms for current node (overrides detected ones)'
+    required: false
+  buildx_append:
+    description: 'Append additional nodes to the builder (YAML format)'
+    required: false
+  buildx_keep_state:
+    description: 'Keep BuildKit state on cleanup (useful for persistent self-hosted runners)'
+    required: false
+  buildx_cache_binary:
+    description: 'Cache buildx binary to GitHub Actions cache backend'
+    required: false
+  buildx_cleanup:
+    description: 'Cleanup temp files and remove builder at the end of a job'
+    required: false
 
 outputs:
   imageid:
@@ -130,7 +165,22 @@ runs:
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      with: ${{ inputs.setup_buildx_with != '' && fromYAML(inputs.setup_buildx_with) || fromYAML('{}') }}
+      with:
+        version: ${{ inputs.buildx_version }}
+        name: ${{ inputs.buildx_name }}
+        driver: ${{ inputs.buildx_driver }}
+        driver-opts: ${{ inputs.buildx_driver_opts }}
+        buildkitd-flags: ${{ inputs.buildx_buildkitd_flags }}
+        buildkitd-config: ${{ inputs.buildx_buildkitd_config }}
+        buildkitd-config-inline: ${{ inputs.buildx_buildkitd_config_inline }}
+        install: ${{ inputs.buildx_install }}
+        use: ${{ inputs.buildx_use }}
+        endpoint: ${{ inputs.buildx_endpoint }}
+        platforms: ${{ inputs.buildx_platforms }}
+        append: ${{ inputs.buildx_append }}
+        keep-state: ${{ inputs.buildx_keep_state }}
+        cache-binary: ${{ inputs.buildx_cache_binary }}
+        cleanup: ${{ inputs.buildx_cleanup }}
 
     - name: Validate inputs
       shell: bash
